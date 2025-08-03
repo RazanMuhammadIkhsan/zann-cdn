@@ -1,18 +1,12 @@
 {
-  "name": "cdn",
+  "name": "zann-cdn",
   "version": "1.0.0",
   "description": "web",
-  "main": "upload.js",
-  "scripts": {
-    "dev": "node upload.js"
-  },
-  "keywords": [],
+  "type": "module",
   "author": "Razan",
   "license": "ISC",
   "dependencies": {
-    "axios": "^1.11.0",
-    "dotenv": "^17.2.1",
-    "express": "^5.1.0",
-    "multer": "^2.0.2"
+    "axios": "^1.7.2",
+    "multer": "^1.4.5-lts.1"
   }
 }

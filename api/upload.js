@@ -1,67 +1,68 @@
-// Menggunakan 'import' sebagai ganti 'require'
-import 'dotenv/config';
-import express from 'express';
 import multer from 'multer';
 import axios from 'axios';
-import path from 'path';
 import crypto from 'crypto';
-// Import helper dari 'url' untuk path yang benar
-import { fileURLToPath } from 'url';
+import path from 'path';
 
-const app = express();
-const port = 3000;
+// Helper untuk menjalankan multer di lingkungan serverless
+const runMiddleware = (req, res, fn) => {
+    return new Promise((resolve, reject) => {
+        fn(req, res, (result) => {
+            if (result instanceof Error) {
+                return reject(result);
+            }
+            return resolve(result);
+        });
+    });
+};
 
 const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 25 * 1024 * 1024 },
+    limits: { fileSize: 20 * 1024 * 1024 } // Limit 20 MB
 });
 
-// ===================================================================
-// --- PERBAIKAN PATH UNTUK SEMUA SISTEM OPERASI (TERMASUK WINDOWS) ---
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-// ===================================================================
-
-// Sekarang Express akan tahu di mana letak folder 'public'
-app.use(express.static(path.join(__dirname, 'public')));
-
-app.post('/api/upload', upload.single('file'), async (req, res) => {
-    if (!req.file) {
-        return res.status(400).json({ error: 'Tidak ada file yang diunggah.' });
+export default async function handler(req, res) {
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method Not Allowed' });
     }
-
-    const { buffer, originalname } = req.file;
-
-    const MAX_FILE_SIZE_MB = 20;
-    if (buffer.length > MAX_FILE_SIZE_MB * 1024 * 1024) {
-        return res.status(413).json({ error: `Ukuran file melebihi batas ${MAX_FILE_SIZE_MB} MB.` });
-    }
-    
-    const githubToken = process.env.GITHUB_TOKEN;
-    const githubUsername = process.env.GITHUB_USERNAME;
-    const githubRepo = process.env.GITHUB_REPO;
-    const customDomain = process.env.CUSTOM_DOMAIN;
-    
-    const fileExtension = path.extname(originalname);
-    const randomName = crypto.randomBytes(16).toString('hex');
-    const fileName = randomName + fileExtension;
-    const filePath = `media/${fileName}`;
-
-    const url = `https://api.github.com/repos/${githubUsername}/${githubRepo}/contents/${filePath}`;
-    const config = { headers: { 'Authorization': `token ${githubToken}` } };
-    const data = { message: `Menambahkan file: ${fileName}`, content: buffer.toString('base64') };
 
     try {
+        // Jalankan middleware multer
+        await runMiddleware(req, res, upload.single('file'));
+        
+        if (!req.file) {
+            return res.status(400).json({ error: 'Tidak ada file yang diunggah.' });
+        }
+
+        const { buffer, originalname } = req.file;
+
+        const githubToken = process.env.GITHUB_TOKEN;
+        const githubUsername = process.env.GITHUB_USERNAME;
+        const githubRepo = process.env.GITHUB_REPO;
+        const customDomain = process.env.CUSTOM_DOMAIN;
+
+        const fileExtension = path.extname(originalname);
+        const randomName = crypto.randomBytes(16).toString('hex');
+        const fileName = randomName + fileExtension;
+        const filePath = `media/${fileName}`;
+
+        const url = `https://api.github.com/repos/${githubUsername}/${githubRepo}/contents/${filePath}`;
+        const config = { headers: { 'Authorization': `token ${githubToken}` } };
+        const data = { message: `Add: ${fileName}`, content: buffer.toString('base64') };
+        
         await axios.put(url, data, config);
+
         const cdnUrl = `https://cdn.jsdelivr.net/gh/${githubUsername}/${githubRepo}@main/${filePath}`;
         const customDomainUrl = customDomain ? `https://${customDomain}/${filePath}` : null;
 
         res.status(200).json({ cdnUrl, customDomainUrl });
-    } catch (error) {
-        res.status(500).json({ error: 'Gagal mengunggah ke GitHub.' });
-    }
-});
 
-app.listen(port, () => {
-    console.log(`Server lokal berjalan di http://localhost:${port}`);
-});
+    } catch (error) {
+        res.status(500).json({ error: 'Terjadi kesalahan di server.', details: error.message });
+    }
+}
+
+export const config = {
+    api: {
+        bodyParser: false,
+    },
+};

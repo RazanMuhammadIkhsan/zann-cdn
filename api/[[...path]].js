@@ -5,7 +5,6 @@ export default async function handler(req, res) {
     const GITHUB_REPO = process.env.GITHUB_REPO;
     
     const filePath = req.url;
-    
     const targetUrl = `https://cdn.jsdelivr.net/gh/${GITHUB_USERNAME}/${GITHUB_REPO}@main${filePath}`;
 
     try {
@@ -14,11 +13,9 @@ export default async function handler(req, res) {
             url: targetUrl,
             responseType: 'stream'
         });
-
         res.writeHead(response.status, response.headers);
         response.data.pipe(res);
-
     } catch (error) {
-        res.status(error.response ? error.response.status : 500).send(error.message);
+        res.status(error.response ? error.response.status : 500).send("File not found or proxy error.");
     }
 }
