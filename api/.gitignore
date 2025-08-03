@@ -1,0 +1,5 @@
+# Abaikan file environment
+.env
+
+# Abaikan folder node_modules
+node_modules/

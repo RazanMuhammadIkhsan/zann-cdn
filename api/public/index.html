@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zann CDN</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Tema Gelap (Default) */
+            --bg-color: #16161a; --surface-color: #242629; --primary-color: #7f5af0; --text-color: #fffffe;
+            --text-muted-color: #94a1b2; --border-color: #3d3d41; --success-color: #2cb67d; --error-color: #ef4565;
+            --copy-btn-bg: #2d2d30; --copy-btn-bg-hover: #3a3a3d;
+        }
+        body.light-mode {
+            /* Tema Terang */
+            --bg-color: #f4f7f9; --surface-color: #ffffff; --primary-color: #007aff; --text-color: #1d1d1f;
+            --text-muted-color: #86868b; --border-color: #d2d2d7; --success-color: #34c759; --error-color: #ff3b30;
+            --copy-btn-bg: #f0f0f0; --copy-btn-bg-hover: #e0e0e0;
+        }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); color: var(--text-color); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 1rem; transition: background-color 0.3s ease; }
+        .container { width: 100%; max-width: 480px; background-color: var(--surface-color); padding: 2rem; border-radius: 16px; border: 1px solid var(--border-color); text-align: center; transition: background-color 0.3s ease; }
+        h1 { font-size: 2rem; }
+        .subtitle { color: var(--text-muted-color); margin: 0 0 2rem; }
+        #fileInput { display: none; }
+        .file-label { display: block; padding: 12px 24px; border: 2px dashed var(--border-color); border-radius: 8px; cursor: pointer; margin-bottom: 1rem;}
+        .upload-button { display: block; width: 100%; padding: 12px 24px; background-color: var(--primary-color); color: white; border: none; border-radius: 8px; cursor: pointer; }
+        .upload-button:disabled { background-color: var(--text-muted-color); cursor: not-allowed; }
+        .file-name { margin-top: 1rem; color: var(--text-muted-color); min-height: 20px; }
+        .result-wrapper { margin-top: 2rem; text-align: left; display: none; }
+        .result-link label { display: block; font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .link-box { display: flex; align-items: center; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; }
+        .link-box input { flex-grow: 1; border: none; padding: 12px; background: none; color: var(--text-color); outline: none; }
+        .link-box button { background-color: var(--copy-btn-bg); border: none; border-left: 1px solid var(--border-color); padding: 12px; cursor: pointer; }
+        .status { margin-top: 1.5rem; font-weight: 500; min-height: 24px; }
+        .status.success { color: var(--success-color); }
+        .status.error { color: var(--error-color); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Zann CDN</h1>
+        <p class="subtitle">Unggah file Anda dengan cepat dan mudah.</p>
+        <form id="uploadForm">
+            <label for="fileInput" class="file-label" id="fileLabel">Pilih File</label>
+            <input type="file" id="fileInput">
+            <p id="fileName" class="file-name">Maks. 20 MB</p>
+            <button type="submit" class="upload-button" id="submitButton" disabled>Upload</button>
+        </form>
+        <div id="status" class="status"></div>
+        <div id="resultWrapper" class="result-wrapper"></div>
+    </div>
+    <script>
+        document.body.classList.remove('light-mode'); 
+        const uploadForm = document.getElementById('uploadForm');
+        const fileInput = document.getElementById('fileInput');
+        const fileNameEl = document.getElementById('fileName');
+        const submitButton = document.getElementById('submitButton');
+        const statusEl = document.getElementById('status');
+        const resultWrapper = document.getElementById('resultWrapper');
+
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length > 0) {
+                fileNameEl.textContent = fileInput.files[0].name;
+                submitButton.disabled = false;
+            } else {
+                fileNameEl.textContent = 'Maks. 20 MB';
+                submitButton.disabled = true;
+            }
+        });
+
+        uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            const MAX_FILE_SIZE_MB = 20;
+            if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+                statusEl.className = 'status error';
+                statusEl.textContent = `Gagal: Ukuran file melebihi batas ${MAX_FILE_SIZE_MB} MB.`;
+                uploadForm.reset();
+                fileNameEl.textContent = `Maks. ${MAX_FILE_SIZE_MB} MB`;
+                submitButton.disabled = true;
+                return;
+            }
+
+            statusEl.className = 'status';
+            statusEl.textContent = 'Mengunggah, mohon tunggu...';
+            resultWrapper.style.display = 'none';
+            submitButton.disabled = true;
+            submitButton.textContent = 'Mengunggah...';
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/api/upload', { method: 'POST', body: formData });
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || 'Gagal mengunggah file.');
+                }
+
+                statusEl.className = 'status success';
+                statusEl.textContent = 'Upload Berhasil!';
+                displayResult(result);
+
+            } catch (error) {
+                statusEl.className = 'status error';
+                statusEl.textContent = `Gagal: ${error.message}`;
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = 'Upload';
+            }
+        });
+
+        const displayResult = (result) => {
+            let html = '';
+            const createLinkBox = (label, id, url) => `
+                <div class="result-link">
+                    <label for="${id}">${label}</label>
+                    <div class="link-box">
+                        <input type="text" id="${id}" value="${url}" readonly>
+                        <button onclick="copyToClipboard('${id}', this)">Salin</button>
+                    </div>
+                </div>`;
+
+            if (result.cdnUrl) html += createLinkBox('Link', 'customLink', result.customDomainUrl);
+            if (result.customDomainUrl) html += createLinkBox('Link  (jsDelivr)', 'cdnLink', result.cdnUrl);
+            
+            resultWrapper.innerHTML = html;
+            resultWrapper.style.display = 'block';
+        };
+
+        window.copyToClipboard = (elementId, button) => {
+            const input = document.getElementById(elementId);
+            input.select();
+            document.execCommand('copy');
+            button.textContent = 'Disalin!';
+            setTimeout(() => { button.textContent = 'Salin'; }, 2000);
+        };
+    </script>
+</body>
+</html>
