@@ -1,9 +1,16 @@
 {
-  "name": "zann-uploader-nodejs",
+  "name": "zann-cdn-railway",
   "version": "1.0.0",
   "type": "module",
+  "description": "Uploader for Railway",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
   "dependencies": {
     "axios": "^1.7.2",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
     "googleapis": "^140.0.1",
     "mongodb": "^6.8.0",
     "multer": "^1.4.5-lts.1",
