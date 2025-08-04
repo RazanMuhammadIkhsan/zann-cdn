@@ -1,7 +1,7 @@
 import { google } from 'googleapis';
 import { MongoClient } from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';
-import { advancedEncrypt, generateSecurePassword } from './_utils/crypto.js';
+import { encrypt, generateSecurePassword } from './_utils/crypto.js';
 import stream from 'stream';
 import multer from 'multer';
 
@@ -17,10 +17,9 @@ const runMiddleware = (req, res, fn) => {
 
 const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 50 * 1024 * 1024 } // 50MB
+    limits: { fileSize: 50 * 1024 * 1024 }
 });
 
-// Cache koneksi MongoDB
 let cachedDb = null;
 async function connectToDatabase() {
     if (cachedDb) return cachedDb;
@@ -38,17 +37,15 @@ export default async function handler(req, res) {
         await runMiddleware(req, res, upload.single('files'));
         if (!req.file) return res.status(400).json({ success: false, error: 'File tidak ditemukan.' });
 
-        // Inisialisasi Google Drive
         const auth = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET);
         auth.setCredentials({ refresh_token: process.env.GOOGLE_REFRESH_TOKEN });
         const drive = google.drive({ version: 'v3', auth });
         
-        // Enkripsi File
         const password = generateSecurePassword();
-        const encryptedBuffer = advancedEncrypt(req.file.buffer, password);
+        // Nama fungsi diubah dari advancedEncrypt menjadi encrypt
+        const encryptedBuffer = encrypt(req.file.buffer, password);
         const fakeName = `${uuidv4()}.tmp`;
 
-        // Upload ke Google Drive
         const bufferStream = new stream.PassThrough();
         bufferStream.end(encryptedBuffer);
         
@@ -57,7 +54,6 @@ export default async function handler(req, res) {
             requestBody: { name: fakeName, parents: [process.env.GOOGLE_FOLDER_ID] }
         });
 
-        // Simpan metadata ke MongoDB
         const db = await connectToDatabase();
         const collection = db.collection("files");
         
@@ -65,11 +61,7 @@ export default async function handler(req, res) {
             _id: uuidv4(),
             drive_id: driveFile.id,
             password: password,
-            file_info: {
-                name: req.file.originalname,
-                mime_type: req.file.mimetype,
-                size: req.file.size
-            },
+            file_info: { name: req.file.originalname, mime_type: req.file.mimetype, size: req.file.size },
             uploaded_at: new Date()
         };
         await collection.insertOne(fileRecord);
