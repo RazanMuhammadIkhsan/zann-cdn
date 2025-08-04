@@ -1,0 +1,12 @@
+{
+  "name": "zann-uploader-nodejs",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "axios": "^1.7.2",
+    "googleapis": "^140.0.1",
+    "mongodb": "^6.8.0",
+    "multer": "^1.4.5-lts.1",
+    "uuid": "^10.0.0"
+  }
+}
